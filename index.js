@@ -150,22 +150,24 @@ function Jasmine2HTMLReporter(options) {
         if ((self.takeScreenshots && !self.takeScreenshotsOnlyOnFailures) ||
             (self.takeScreenshots && self.takeScreenshotsOnlyOnFailures && isFailed(spec))) {
             spec.screenshot = hat() + '.png';
-            browser.takeScreenshot().then(function (png) {
-                browser.getCapabilities().then(function (capabilities) {
-                    var screenshotPath;
+			process.nextTick(function() {
+				browser.takeScreenshot().then(function (png) {
+					browser.getCapabilities().then(function (capabilities) {
+						var screenshotPath;
 
 
-                    //Folder structure and filename
-                    screenshotPath = path.join(self.savePath + self.screenshotsFolder, spec.screenshot);
+						//Folder structure and filename
+						screenshotPath = path.join(self.savePath, self.screenshotsFolder, spec.screenshot);
 
-                    mkdirp(path.dirname(screenshotPath), function (err) {
-                        if (err) {
-                            throw new Error('Could not create directory for ' + screenshotPath);
-                        }
-                        writeScreenshot(png, screenshotPath);
-                    });
-                });
-            });
+						mkdirp(path.dirname(screenshotPath), function (err) {
+							if (err) {
+								throw new Error('Could not create directory for ' + screenshotPath);
+							}
+							writeScreenshot(png, screenshotPath);
+						});
+					});
+				});
+			});
         }
 
 
