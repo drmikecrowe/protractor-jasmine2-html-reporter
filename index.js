@@ -8,7 +8,10 @@ require('string.prototype.startswith');
 
 var UNDEFINED, exportObject = exports;
 
-
+function sanitizeFilename(name){
+    name = name.replace(/\s+/gi, '-'); // Replace white space with dash
+    return name.replace(/[^a-zA-Z0-9\-]/gi, ''); // Strip any special charactere
+}
 function trim(str) { return str.replace(/^\s+/, "" ).replace(/\s+$/, "" ); }
 function elapsed(start, end) { return (end - start)/1000; }
 function isFailed(obj) { return obj.status === "failed"; }
@@ -62,8 +65,8 @@ function rmdir(dir) {
             }
         }
         fs.rmdirSync(dir);
-    }catch (e) { log("problem trying to remove a folder"); }
-};
+    }catch (e) { log("problem trying to remove a folder:" + dir); }
+}
 
 function Jasmine2HTMLReporter(options) {
 
@@ -78,6 +81,7 @@ function Jasmine2HTMLReporter(options) {
     self.takeScreenshotsOnlyOnFailures = options.takeScreenshotsOnlyOnFailures === UNDEFINED ? false : options.takeScreenshotsOnlyOnFailures;
     self.screenshotsFolder = (options.screenshotsFolder || 'screenshots').replace(/^\//, '') + '/';
     self.useDotNotation = options.useDotNotation === UNDEFINED ? true : options.useDotNotation;
+    self.fixedScreenshotName = options.fixedScreenshotName === UNDEFINED ? false : options.fixedScreenshotName;
     self.consolidate = options.consolidate === UNDEFINED ? true : options.consolidate;
     self.consolidateAll = self.consolidate !== false && (options.consolidateAll === UNDEFINED ? true : options.consolidateAll);
     self.filePrefix = options.filePrefix || (self.consolidateAll ? 'htmlReport' : 'htmlReport-');
@@ -86,7 +90,7 @@ function Jasmine2HTMLReporter(options) {
         currentSuite = null,
         totalSpecsExecuted = 0,
         totalSpecsDefined,
-    // when use use fit, jasmine never calls suiteStarted / suiteDone, so make a fake one to use
+        // when use use fit, jasmine never calls suiteStarted / suiteDone, so make a fake one to use
         fakeFocusedSuite = {
             id: 'focused',
             description: 'focused specs',
@@ -149,25 +153,29 @@ function Jasmine2HTMLReporter(options) {
         //Take screenshots taking care of the configuration
         if ((self.takeScreenshots && !self.takeScreenshotsOnlyOnFailures) ||
             (self.takeScreenshots && self.takeScreenshotsOnlyOnFailures && isFailed(spec))) {
-            spec.screenshot = hat() + '.png';
-			process.nextTick(function() {
-				browser.takeScreenshot().then(function (png) {
-					browser.getCapabilities().then(function (capabilities) {
-						var screenshotPath;
+            if (!self.fixedScreenshotName)
+                spec.screenshot = hat() + '.png';
+            else
+                spec.screenshot = sanitizeFilename(spec.description) + '.png';
+
+            process.nextTick(function() {
+                browser.takeScreenshot().then(function (png) {
+                    browser.getCapabilities().then(function (capabilities) {
+                        var screenshotPath;
 
 
-						//Folder structure and filename
-						screenshotPath = path.join(self.savePath, self.screenshotsFolder, spec.screenshot);
+                        //Folder structure and filename
+                        screenshotPath = path.join(self.savePath + self.screenshotsFolder, spec.screenshot);
 
-						mkdirp(path.dirname(screenshotPath), function (err) {
-							if (err) {
-								throw new Error('Could not create directory for ' + screenshotPath);
-							}
-							writeScreenshot(png, screenshotPath);
-						});
-					});
-				});
-			});
+                        mkdirp(path.dirname(screenshotPath), function (err) {
+                            if (err) {
+                                throw new Error('Could not create directory for ' + screenshotPath);
+                            }
+                            writeScreenshot(png, screenshotPath);
+                        });
+                    });
+                });
+            });
         }
 
 
@@ -273,8 +281,8 @@ function Jasmine2HTMLReporter(options) {
             html += specAsHtml(spec);
                 html += '<div class="resume">';
                 if (spec.screenshot !== UNDEFINED){
-                    html += '<a href="' + self.screenshotsFolder + '/' + spec.screenshot + '">';
-                    html += '<img src="' + self.screenshotsFolder + '/' + spec.screenshot + '" width="100" height="100" />';
+                    html += '<a href="' + self.screenshotsFolder + spec.screenshot + '">';
+                    html += '<img src="' + self.screenshotsFolder + spec.screenshot + '" width="100" height="100" />';
                     html += '</a>';
                 }
                 html += '<br />';
