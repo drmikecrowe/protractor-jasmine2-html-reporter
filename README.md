@@ -5,6 +5,7 @@ HTML reporter for Jasmine2 and Protractor that will include screenshots of each 
 This work is inspired by:
 * [Protractor Jasmine 2 Screenshot Reporter](https://github.com/mlison/protractor-jasmine2-screenshot-reporter) from [@mslison](https://github.com/mlison)
 * [Jasmine Reporters](https://github.com/larrymyers/jasmine-reporters) from [@larrymyers](https://github.com/larrymyers)
+* [Protractor HTML Reporter by Kenzitron](https://github.com/Kenzitron/protractor-jasmine2-html-reporter)
 
 ## Usage
 The <code>protractor-jasmine2-html-reporter</code> is available via npm:
@@ -105,6 +106,19 @@ This option allow you to create diferent HTML for each test suite.
 <pre><code>jasmine.getEnv().addReporter(new Jasmine2HtmlReporter({
    consolidate: true,
    consolidateAll: true
+}));</code></pre>
+
+Default is <code>false</code>
+
+## NEW Additions by Mike Crowe
+
+### Saving HTML on failure
+
+This option saves the current HTML content to a file upon failure.
+
+<pre><code>jasmine.getEnv().addReporter(new Jasmine2HtmlReporter({
+   rawHTMLPath: 'raw-html',
+   saveHTMLonFailure: true
 }));</code></pre>
 
 Default is <code>false</code>

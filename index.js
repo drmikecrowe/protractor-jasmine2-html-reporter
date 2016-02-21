@@ -79,6 +79,8 @@ function Jasmine2HTMLReporter(options) {
     self.takeScreenshots = options.takeScreenshots === UNDEFINED ? true : options.takeScreenshots;
     self.savePath = options.savePath || '';
     self.takeScreenshotsOnlyOnFailures = options.takeScreenshotsOnlyOnFailures === UNDEFINED ? false : options.takeScreenshotsOnlyOnFailures;
+    self.saveHTMLonFailure = options.saveHTMLonFailure === UNDEFINED ? false : options.saveHTMLonFailure;
+	self.rawHTMLPath                   = options.rawHTMLPath || 'raw-html';
     self.screenshotsFolder = (options.screenshotsFolder || 'screenshots').replace(/^\//, '') + '/';
     self.useDotNotation = options.useDotNotation === UNDEFINED ? true : options.useDotNotation;
     self.fixedScreenshotName = options.fixedScreenshotName === UNDEFINED ? false : options.fixedScreenshotName;
@@ -114,7 +116,14 @@ function Jasmine2HTMLReporter(options) {
 
         //Delete previous screenshoots
         rmdir(self.savePath);
-
+		if (self.takeScreenshots) {
+			self.screenshotPath = path.join(self.savePath + self.screenshotsFolder);
+			mkdirp.sync(self.screenshotPath);
+		}
+		if (self.saveHTMLonFailure) {
+		    self.rawPath = path.join(self.savePath + self.rawHTMLPath);
+		    mkdirp.sync(self.rawPath);
+		}
     };
     self.suiteStarted = function(suite) {
         suite = getSuite(suite);
@@ -153,32 +162,23 @@ function Jasmine2HTMLReporter(options) {
         //Take screenshots taking care of the configuration
         if ((self.takeScreenshots && !self.takeScreenshotsOnlyOnFailures) ||
             (self.takeScreenshots && self.takeScreenshotsOnlyOnFailures && isFailed(spec))) {
-            if (!self.fixedScreenshotName)
+			if (!self.fixedScreenshotName) {
                 spec.screenshot = hat() + '.png';
-            else
+			} else {
                 spec.screenshot = sanitizeFilename(spec.description) + '.png';
 
-            process.nextTick(function() {
-                browser.takeScreenshot().then(function (png) {
-                    browser.getCapabilities().then(function (capabilities) {
-                        var screenshotPath;
-
-
-                        //Folder structure and filename
-                        screenshotPath = path.join(self.savePath + self.screenshotsFolder, spec.screenshot);
-
-                        mkdirp(path.dirname(screenshotPath), function (err) {
-                            if (err) {
-                                throw new Error('Could not create directory for ' + screenshotPath);
-                            }
-                            writeScreenshot(png, screenshotPath);
-                        });
-                    });
-                });
-            });
+			}
+			browser.takeScreenshot()
+				.then(function (png) {
+				writeScreenshot(png, path.join(self.screenshotPath, spec.screenshot));
+			});
         }
-
-
+		if (isFailed(spec) && self.saveHTMLonFailure) {
+			browser.getPageSource()
+				.then(function (src) {
+					fs.writeFileSync(path.join(self.rawPath, sanitizeFilename(spec.description) + '.html'), src);
+				});
+		}
     };
     self.suiteDone = function(suite) {
         suite = getSuite(suite);
@@ -281,7 +281,7 @@ function Jasmine2HTMLReporter(options) {
             html += specAsHtml(spec);
                 html += '<div class="resume">';
                 if (spec.screenshot !== UNDEFINED){
-                    html += '<a href="' + self.screenshotsFolder + spec.screenshot + '">';
+                    html += '<a href="#" data-featherlight="' + self.screenshotsFolder + spec.screenshot + '">';
                     html += '<img src="' + self.screenshotsFolder + spec.screenshot + '" width="100" height="100" />';
                     html += '</a>';
                 }
@@ -357,9 +357,12 @@ function Jasmine2HTMLReporter(options) {
     };
 
     // To remove complexity and be more DRY about the silly preamble and <testsuites> element
-    var prefix = '<!DOCTYPE html><html><head lang=en><meta charset=UTF-8><title></title><style>body{font-family:"open_sans",sans-serif}.suite{width:100%;overflow:auto}.suite .stats{margin:0;width:90%;padding:0}.suite .stats li{display:inline;list-style-type:none;padding-right:20px}.suite h2{margin:0}.suite header{margin:0;padding:5px 0 5px 5px;background:#003d57;color:white}.spec{width:100%;overflow:auto;border-bottom:1px solid #e5e5e5}.spec:hover{background:#e8f3fb}.spec h3{margin:5px 0}.spec .description{margin:1% 2%;width:65%;float:left}.spec .resume{width:29%;margin:1%;float:left;text-align:center}</style></head>';
+    var prefix = '<!DOCTYPE html><html><head lang=en><meta charset=UTF-8><title></title><style>body{font-family:"open_sans",sans-serif}.suite{width:100%;overflow:auto}.suite .stats{margin:0;width:90%;padding:0}.suite .stats li{display:inline;list-style-type:none;padding-right:20px}.suite h2{margin:0}.suite header{margin:0;padding:5px 0 5px 5px;background:#003d57;color:white}.spec{width:100%;overflow:auto;border-bottom:1px solid #e5e5e5}.spec:hover{background:#e8f3fb}.spec h3{margin:5px 0}.spec .description{margin:1% 2%;width:65%;float:left}.spec .resume{width:29%;margin:1%;float:left;text-align:center}</style><link href="http://cdn.rawgit.com/noelboss/featherlight/1.3.5/release/featherlight.min.css" type="text/css" rel="stylesheet" /></head>';
         prefix += '<body><section>';
-    var suffix = '\n</section></body></html>';
+    var suffix = '\n</section>' +
+		'<script src="http://code.jquery.com/jquery-latest.js"></script>' +
+		'<script src="http://cdn.rawgit.com/noelboss/featherlight/1.3.5/release/featherlight.min.js" type="text/javascript" charset="utf-8"></script>' +
+		'</body></html>';
     function wrapOutputAndWriteFile(filename, text) {
         if (filename.substr(-5) !== '.html') { filename += '.html'; }
         self.writeFile(filename, (prefix + text + suffix));
